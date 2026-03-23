@@ -1,10 +1,16 @@
 """
 Runkeeper ZIP export parser.
 
-Expected contents:
-  cardioActivities.csv  — one row per activity (summary)
-  *.gpx                 — one GPX file per activity (GPS + optional HR)
+Two supported formats:
+
+1. Full export ZIP (from Runkeeper app/website):
+      cardioActivities.csv  — one row per activity (summary)
+      *.gpx                 — one GPX file per activity
+
+2. GPX-only folder ZIP (e.g. a folder of files like 2024-03-28-070908.gpx):
+      *.gpx only — activity type and date inferred from file name / GPX content
 """
+import re
 import zipfile
 import tempfile
 import os
@@ -145,5 +151,91 @@ def parse_runkeeper_zip(zip_path: str) -> dict:
                 "calories": _safe_float(row.get("Calories Burned", row.get("Calories", None))),
                 "gpx_points": gpx_data,
             })
+
+    return result
+
+
+# ── GPX-folder parser ─────────────────────────────────────────────────────────
+
+# Matches filenames like: 2024-03-28-070908.gpx  or  2024-03-28.gpx
+_GPX_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})(?:-(\d{6}))?")
+
+
+def _date_from_filename(fname: str) -> Optional[datetime]:
+    """Extract a datetime from a GPX filename like 2024-03-28-070908.gpx."""
+    m = _GPX_DATE_RE.search(os.path.basename(fname))
+    if not m:
+        return None
+    date_str = m.group(1)
+    time_str = m.group(2) or "000000"
+    try:
+        return datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H%M%S")
+    except ValueError:
+        return None
+
+
+def parse_gpx_folder_zip(zip_path: str) -> dict:
+    """
+    Parse a ZIP that contains only GPX files (no CSV summary).
+    Handles Runkeeper folder exports: files named YYYY-MM-DD-HHMMSS.gpx.
+
+    Activity type is read from the GPX <type> tag if present, then inferred
+    from the track name, then falls back to "run".
+    Date/time comes from the filename, falling back to the first GPS point.
+    """
+    result = {"activities": []}
+    errors = []
+
+    with tempfile.TemporaryDirectory() as tmp:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(tmp)
+
+        gpx_files = []
+        for root, _, files in os.walk(tmp):
+            for fname in sorted(files):
+                if fname.lower().endswith(".gpx"):
+                    gpx_files.append(os.path.join(root, fname))
+
+        for fpath in gpx_files:
+            fname = os.path.basename(fpath)
+            try:
+                gpx_data = parse_gpx_file(fpath)
+            except Exception as e:
+                errors.append({"file": fname, "error": str(e)})
+                continue
+
+            if not gpx_data["points"]:
+                continue  # empty file — skip silently
+
+            # Date: prefer filename, fall back to first GPS point
+            dt = _date_from_filename(fname)
+            if not dt and gpx_data["start_time"]:
+                dt = gpx_data["start_time"]
+            if not dt:
+                errors.append({"file": fname, "error": "Could not determine date"})
+                continue
+
+            # Activity type: GPX <type> tag → track name → "run"
+            raw_type = gpx_data.get("activity_type") or ""
+            if not raw_type and gpx_data.get("name"):
+                # e.g. track name "Running 2024-03-28 07:09" → "Running"
+                raw_type = gpx_data["name"].split()[0]
+            activity_type = _normalise_type(raw_type) if raw_type else "run"
+
+            result["activities"].append({
+                "source": "runkeeper",
+                "date": dt.date(),
+                "activity_type": activity_type,
+                "duration_seconds": gpx_data["duration_seconds"],
+                "distance_meters": gpx_data["distance_meters"] or None,
+                "avg_heart_rate": gpx_data["avg_heart_rate"],
+                "calories": None,  # not available without the CSV
+                "gpx_points": gpx_data["points"],
+            })
+
+    if errors:
+        print(f"[gpx_folder] {len(errors)} file(s) had errors:")
+        for e in errors:
+            print(f"  {e['file']}: {e['error']}")
 
     return result

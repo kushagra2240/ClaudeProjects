@@ -82,6 +82,33 @@
     </div>
   </div>
 
+  <!-- GPX folder upload -->
+  <div class="card">
+    <div class="card-title">📂 GPX Folder (Runkeeper / Garmin / any app)</div>
+
+    <p style="font-size:13px;font-weight:600;margin:0 0 8px;color:var(--text-secondary)">Use this if you have a folder of .gpx files:</p>
+    <ol class="steps-list">
+      <li><span class="step-num">1</span><span>Locate the folder of <strong>.gpx files</strong> on your computer (e.g. the Runkeeper export folder)</span></li>
+      <li><span class="step-num">2</span><span>Select all files inside → right-click → <strong>Compress to ZIP</strong> (Windows) or <strong>Compress</strong> (Mac)</span></li>
+      <li><span class="step-num">3</span><span>Upload the ZIP below — all GPX files inside will be parsed automatically</span></li>
+    </ol>
+    <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px">
+      Activity type is read from the GPX file itself. Date is read from the filename (e.g. <code>2024-03-28-070908.gpx</code>).
+      Works with Runkeeper, Garmin Connect, Strava, and any standard GPX export.
+    </p>
+
+    <label class="upload-zone" id="gpx-zone">
+      <input type="file" id="gpx-file" accept=".zip">
+      <div class="icon">🗜️</div>
+      <div class="label">Tap to select GPX folder ZIP</div>
+      <div class="hint" id="gpx-filename">or drag and drop here</div>
+    </label>
+    <div class="progress-bar" id="gpx-progress-wrap" style="display:none">
+      <div class="progress-fill" id="gpx-progress" style="width:0%"></div>
+    </div>
+    <button class="btn btn-primary btn-full" id="gpx-btn" style="margin-top:12px" onclick="uploadFile('gpx-folder')">Import GPX Files</button>
+  </div>
+
   <!-- Runkeeper upload -->
   <div class="card">
     <div class="card-title">🏃 Runkeeper</div>

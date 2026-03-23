@@ -1,5 +1,5 @@
 // Drag-and-drop setup
-["mf", "rk"].forEach(prefix => {
+["mf", "rk", "gpx"].forEach(prefix => {
   const zone = document.getElementById(`${prefix}-zone`);
   const fileInput = document.getElementById(`${prefix}-file`);
   const label = document.getElementById(`${prefix}-filename`);
@@ -142,7 +142,7 @@ function renderPreview(d) {
 // ── Import ────────────────────────────────────────────────────────────────────
 
 async function uploadFile(source) {
-  const prefix = source === "mi-fitness" ? "mf" : "rk";
+  const prefix = source === "mi-fitness" ? "mf" : source === "runkeeper" ? "rk" : "gpx";
   const fileInput = document.getElementById(`${prefix}-file`);
   const btn = document.getElementById(`${prefix}-btn`);
   const progressWrap = document.getElementById(`${prefix}-progress-wrap`);

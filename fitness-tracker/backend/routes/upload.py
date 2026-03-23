@@ -9,7 +9,7 @@ from backend.database import get_db
 from backend.models.activity import Activity
 from backend.models.health import DailySteps, HeartRate, SleepRecord
 from backend.parsers.mi_fitness import parse_mi_fitness_zip, preview_mi_fitness_zip
-from backend.parsers.runkeeper import parse_runkeeper_zip
+from backend.parsers.runkeeper import parse_runkeeper_zip, parse_gpx_folder_zip
 
 router = APIRouter(prefix="/api/upload", tags=["upload"])
 
@@ -146,6 +146,34 @@ async def upload_runkeeper(file: UploadFile = File(...), db: Session = Depends(g
         raise HTTPException(422, f"Could not parse Runkeeper export: {e}")
     finally:
         os.unlink(tmp_path)
+
+    a_add, a_skip = _upsert_activities(db, data["activities"])
+
+    return {
+        "imported": {"activities": a_add},
+        "skipped": {"activities": a_skip},
+    }
+
+
+@router.post("/gpx-folder")
+async def upload_gpx_folder(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Accept a ZIP of GPX files (no CSV needed).
+    Handles Runkeeper folder exports: files named YYYY-MM-DD-HHMMSS.gpx.
+    """
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(400, "Please upload a .zip file containing your GPX files")
+
+    tmp_path = _save_upload(file)
+    try:
+        data = parse_gpx_folder_zip(tmp_path)
+    except Exception as e:
+        raise HTTPException(422, f"Could not parse GPX folder: {e}")
+    finally:
+        os.unlink(tmp_path)
+
+    if not data["activities"]:
+        raise HTTPException(422, "No GPX files with valid track data found in this ZIP")
 
     a_add, a_skip = _upsert_activities(db, data["activities"])
 
