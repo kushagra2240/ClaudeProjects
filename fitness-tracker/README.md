@@ -33,7 +33,7 @@ A personal fitness dashboard for aggregating and visualising workout and health 
 ### 1. Clone the repo
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/kushagra2240/ClaudeProjects.git
 cd fitness-tracker
 ```
 
