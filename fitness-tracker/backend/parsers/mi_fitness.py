@@ -124,19 +124,44 @@ def _parse_sleep(path: str) -> list[dict]:
 
 
 _SPORT_TYPE_MAP = {
-    "1": "run", "6": "walk", "9": "cycle", "10": "swim",
-    "run": "run", "walk": "walk", "cycling": "cycle", "swimming": "swim",
+    # Numeric sport type IDs used by Mi Fitness / Xiaomi watches
+    "1": "run",         # Outdoor Running
+    "2": "run",         # Treadmill Running
+    "3": "cycle",       # Outdoor Cycling
+    "4": "cycle",       # Indoor Cycling
+    "5": "walk",        # Outdoor Walking
+    "6": "walk",        # Walking
+    "7": "hike",        # Hiking
+    "8": "hike",        # Mountaineering / Climbing
+    "9": "cycle",       # Cycling (variant)
+    "10": "swim",       # Open Water Swimming
+    "11": "swim",       # Pool Swimming
+    "14": "hike",       # Trekking
+    "21": "elliptical", # Elliptical
+    "24": "yoga",       # Yoga
+    "25": "jump_rope",  # Jump Rope
+    "35": "hiit",       # HIIT
+    "48": "strength",   # Strength Training
+    # String labels (from some export versions)
+    "run": "run", "running": "run", "outdoor running": "run", "treadmill": "run",
+    "walk": "walk", "walking": "walk", "outdoor walking": "walk",
+    "cycling": "cycle", "cycle": "cycle", "outdoor cycling": "cycle",
+    "swimming": "swim", "swim": "swim",
+    "hiking": "hike", "hike": "hike",
+    "elliptical": "elliptical",
+    "yoga": "yoga",
+    "strength": "strength", "strength training": "strength",
 }
 
 
 def _parse_activities(path: str) -> list[dict]:
     df = pd.read_csv(path, skipinitialspace=True)
-    date_col = _col(df, "date", "time", "startTime", "start_time")
+    date_col = _col(df, "date", "startTime", "start_time", "time", "begin_time")
     type_col = _col(df, "type", "sport_type", "sportType", "activity_type")
-    dur_col = _col(df, "duration", "duration_seconds", "durationSeconds", "time")
+    dur_col = _col(df, "duration", "duration_seconds", "durationSeconds", "costTime", "cost_time")
     dist_col = _col(df, "distance", "distanceMeters", "distance_meters")
-    hr_col = _col(df, "avg_heart_rate", "avgHeartRate", "heart_rate", "bpm")
-    cal_col = _col(df, "calories", "cal")
+    hr_col = _col(df, "avg_heart_rate", "avgHeartRate", "heart_rate", "bpm", "avgHr")
+    cal_col = _col(df, "calories", "cal", "calorie")
 
     records = []
     for _, row in df.iterrows():
@@ -194,3 +219,69 @@ def parse_mi_fitness_zip(zip_path: str) -> dict:
                         break
 
     return result
+
+
+def preview_mi_fitness_zip(zip_path: str) -> dict:
+    """
+    Inspect a Mi Fitness ZIP without importing anything.
+    Returns metadata: which files were found, their columns, record counts, and date ranges.
+    """
+    summary = {
+        "files_found": [],
+        "unrecognised_files": [],
+        "counts": {"steps": 0, "heartrate": 0, "sleep": 0, "activities": 0},
+        "date_ranges": {},
+        "columns": {},
+        "activity_types": [],
+        "errors": [],
+    }
+
+    with tempfile.TemporaryDirectory() as tmp:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            all_names = zf.namelist()
+            summary["files_found"] = [n for n in all_names if n.lower().endswith(".csv")]
+            zf.extractall(tmp)
+
+        for root, _, files in os.walk(tmp):
+            for fname in files:
+                if not fname.lower().endswith(".csv"):
+                    continue
+                fpath = os.path.join(root, fname)
+                matched = False
+                for pattern, (key, parser) in _FILE_PARSERS.items():
+                    if pattern.search(fname):
+                        matched = True
+                        try:
+                            df = pd.read_csv(fpath, skipinitialspace=True)
+                            summary["columns"][fname] = list(df.columns)
+                            records = parser(fpath)
+                            summary["counts"][key] += len(records)
+
+                            # Date range
+                            dates = []
+                            for r in records:
+                                d = r.get("date") or (r.get("timestamp") and r["timestamp"].date())
+                                if d:
+                                    dates.append(d)
+                            if dates:
+                                summary["date_ranges"][key] = {
+                                    "from": str(min(dates)),
+                                    "to": str(max(dates)),
+                                }
+
+                            # Activity type breakdown
+                            if key == "activities":
+                                types = {}
+                                for r in records:
+                                    t = r.get("activity_type", "unknown")
+                                    types[t] = types.get(t, 0) + 1
+                                summary["activity_types"] = [
+                                    {"type": t, "count": c} for t, c in sorted(types.items(), key=lambda x: -x[1])
+                                ]
+                        except Exception as e:
+                            summary["errors"].append({"file": fname, "error": str(e)})
+                        break
+                if not matched:
+                    summary["unrecognised_files"].append(fname)
+
+    return summary

@@ -8,7 +8,7 @@ from sqlalchemy.dialects.sqlite import insert
 from backend.database import get_db
 from backend.models.activity import Activity
 from backend.models.health import DailySteps, HeartRate, SleepRecord
-from backend.parsers.mi_fitness import parse_mi_fitness_zip
+from backend.parsers.mi_fitness import parse_mi_fitness_zip, preview_mi_fitness_zip
 from backend.parsers.runkeeper import parse_runkeeper_zip
 
 router = APIRouter(prefix="/api/upload", tags=["upload"])
@@ -31,11 +31,12 @@ def _upsert_activities(db: Session, records: list[dict]) -> tuple[int, int]:
             .on_conflict_do_nothing(index_elements=None)
         )
         # SQLite ON CONFLICT via unique constraint
-        existing = (
-            db.query(Activity)
-            .filter_by(source=r["source"], date=r["date"], duration_seconds=r["duration_seconds"])
-            .first()
-        )
+        q = db.query(Activity).filter_by(source=r["source"], date=r["date"])
+        if r["duration_seconds"] is not None:
+            q = q.filter(Activity.duration_seconds == r["duration_seconds"])
+        else:
+            q = q.filter(Activity.activity_type == r["activity_type"])
+        existing = q.first()
         if existing:
             skipped += 1
         else:
@@ -82,6 +83,21 @@ def _upsert_sleep(db: Session, records: list[dict]) -> tuple[int, int]:
             added += 1
     db.commit()
     return added, skipped
+
+
+@router.post("/mi-fitness/preview")
+async def preview_mi_fitness(file: UploadFile = File(...)):
+    """Inspect a Mi Fitness ZIP and return metadata without importing anything."""
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(400, "Please upload a .zip file exported from Mi Fitness")
+
+    tmp_path = _save_upload(file)
+    try:
+        return preview_mi_fitness_zip(tmp_path)
+    except Exception as e:
+        raise HTTPException(422, f"Could not read Mi Fitness export: {e}")
+    finally:
+        os.unlink(tmp_path)
 
 
 @router.post("/mi-fitness")

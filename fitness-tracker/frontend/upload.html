@@ -7,6 +7,27 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#4f8ef7">
   <link rel="stylesheet" href="/static/css/app.css">
+  <style>
+    .steps-list { list-style: none; padding: 0; margin: 0 0 14px; }
+    .steps-list li { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: 13px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+    .steps-list li:last-child { border-bottom: none; }
+    .step-num { background: var(--accent); color: #fff; border-radius: 50%; width: 20px; height: 20px; min-width: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; margin-top: 1px; }
+    .preview-box { background: var(--surface-2, #f8f9fa); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin: 12px 0; }
+    .preview-box h4 { margin: 0 0 10px; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; }
+    .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .preview-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+    .preview-stat .num { font-size: 20px; font-weight: 700; color: var(--accent); }
+    .preview-stat .lbl { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .preview-stat .range { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+    .activity-breakdown { margin-top: 10px; }
+    .activity-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+    .activity-row:last-child { border-bottom: none; }
+    .error-row { font-size: 12px; color: var(--error, #e53935); padding: 4px 0; }
+    .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-row .btn { flex: 1; }
+    details summary { cursor: pointer; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+    details pre { font-size: 11px; overflow-x: auto; background: var(--surface-2, #f8f9fa); padding: 8px; border-radius: 6px; margin-top: 6px; }
+  </style>
 </head>
 <body>
 
@@ -31,27 +52,48 @@
   <!-- Mi Fitness upload -->
   <div class="card">
     <div class="card-title">📱 Mi Fitness (Redmi Watch)</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
-      In Mi Fitness app: Profile → Settings → Export Data → Download ZIP
-    </p>
+
+    <p style="font-size:13px;font-weight:600;margin:0 0 8px;color:var(--text-secondary)">How to export your data:</p>
+    <ol class="steps-list">
+      <li><span class="step-num">1</span><span>Open the <strong>Mi Fitness</strong> app on your phone</span></li>
+      <li><span class="step-num">2</span><span>Tap <strong>Profile</strong> (bottom right)</span></li>
+      <li><span class="step-num">3</span><span>Tap the <strong>Settings</strong> icon (top right, ⚙️)</span></li>
+      <li><span class="step-num">4</span><span>Tap <strong>Account &amp; Privacy</strong> → <strong>Export Personal Data</strong></span></li>
+      <li><span class="step-num">5</span><span>Tap <strong>Export</strong> — Mi Fitness will prepare a ZIP and download it</span></li>
+      <li><span class="step-num">6</span><span>Transfer the ZIP to your computer, or open this page from your phone and upload directly</span></li>
+    </ol>
+
     <label class="upload-zone" id="mf-zone">
       <input type="file" id="mf-file" accept=".zip">
       <div class="icon">🗜️</div>
       <div class="label">Tap to select Mi Fitness ZIP</div>
       <div class="hint" id="mf-filename">or drag and drop here</div>
     </label>
+
     <div class="progress-bar" id="mf-progress-wrap" style="display:none">
       <div class="progress-fill" id="mf-progress" style="width:0%"></div>
     </div>
-    <button class="btn btn-primary btn-full" id="mf-btn" onclick="uploadFile('mi-fitness')">Upload &amp; Import</button>
+
+    <div id="mf-preview-box"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="mf-preview-btn" onclick="previewFile()">Preview</button>
+      <button class="btn btn-primary" id="mf-btn" onclick="uploadFile('mi-fitness')">Import</button>
+    </div>
   </div>
 
   <!-- Runkeeper upload -->
   <div class="card">
     <div class="card-title">🏃 Runkeeper</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
-      In Runkeeper app or web: Settings → Export Data → Request Data Export → Download ZIP
-    </p>
+
+    <p style="font-size:13px;font-weight:600;margin:0 0 8px;color:var(--text-secondary)">How to export your data:</p>
+    <ol class="steps-list">
+      <li><span class="step-num">1</span><span>Open the <strong>Runkeeper</strong> app or go to runkeeper.com</span></li>
+      <li><span class="step-num">2</span><span>Go to <strong>Settings</strong> → <strong>Export Data</strong></span></li>
+      <li><span class="step-num">3</span><span>Tap <strong>Request Data Export</strong> — Runkeeper emails you a download link</span></li>
+      <li><span class="step-num">4</span><span>Download the ZIP from the email link and upload it below</span></li>
+    </ol>
+
     <label class="upload-zone" id="rk-zone">
       <input type="file" id="rk-file" accept=".zip">
       <div class="icon">🗜️</div>
@@ -61,7 +103,7 @@
     <div class="progress-bar" id="rk-progress-wrap" style="display:none">
       <div class="progress-fill" id="rk-progress" style="width:0%"></div>
     </div>
-    <button class="btn btn-primary btn-full" id="rk-btn" onclick="uploadFile('runkeeper')">Upload &amp; Import</button>
+    <button class="btn btn-primary btn-full" id="rk-btn" style="margin-top:12px" onclick="uploadFile('runkeeper')">Import</button>
   </div>
 </main>
 
