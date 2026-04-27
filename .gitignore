@@ -34,3 +34,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Personal design notes
+fitness-tracker/design_philosophy.md
